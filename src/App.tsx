@@ -42,15 +42,17 @@ const App: React.FC = () => {
                   }}
                 >
                   {
-                    data.activeBusinessLicenses.map((abl: any) => (
-                      <Marker
-                        key={abl.bfn}
-                        position={{
-                          lat: abl.latitude,
-                          lng: abl.longitude
-                        }}
-                      />
-                    ))
+                    data.activeBusinessLicenses
+                      .filter((abl: any) => abl.latitude)
+                      .map((abl: any) => (
+                        <Marker
+                          key={abl.bfn}
+                          position={{
+                            lat: abl.latitude,
+                            lng: abl.longitude
+                          }}
+                        />
+                      ))
                   }
                 </GoogleMap>
               </LoadScript >
