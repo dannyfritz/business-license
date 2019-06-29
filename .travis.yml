@@ -1,0 +1,20 @@
+language: node_js
+node_js:
+  - 12.4.0
+
+cache:
+  directories:
+    - node_modules
+
+before_deploy:
+  - npm run build
+
+branches:
+  only:
+  - master
+
+deploy:
+  skip_cleanup: true
+  provider: firebase
+  token:
+    secure: VD6BEaJY/d2yyeflfEzJZFN4FMIIgjreQH70u6lGHrS9PFMhdpLkYMl3v87UpPScKlmi+vSi/9VpVH7G0QIh/2yurUgTZ1bN2tNUC/q8TANFX1hhdD0h2X9VSgI+66J5TzL4basi4IAyXL7308bb1s0S7Hipd2JcV+s/gQs2vEg0Mfxc1816liu0/tvDbcfy93vn7MfntN8xX1LOW76cv/u4H+nsbAVT/OaoAPu+AWx9xjjt4iYt2esq7h/ZalG2sKNVQ+BmQ6t2zkt5ixkyKZ+1V8SkofDMwuWaLPoi4pHd6L5bCT9zY8HyNWnKDar5o0ijd/xVh+v+er8hdvbrzNLI5c50tJMqYCn93/v1PARTTeeVa3Hv+bLSnP8kwvqKpD9qvWtQQ9ZQMMcnehOa8DUZXOKkjdP/uQOOBFJkKki1xzQGZFWOSvMq4oZpw/cAThzW0NudTKzkJi9oAGgLmBXGGZlecuuaiYa3t9BgTXusOp9cq4p45Zl9GzF6TZxwT0mZiwCE+E35Zvq3WhmxvFhoE+uuVT3lqoTUGX0Hrfrj2YxWdxADaLa0Gb46nFt1juvcV726J8032Fv1Nbv9nrKhGm5Sx2FCmWcfSc2lPsLRwShmUlQu7fcDfx4y01ZCvG6y46/9wZRdrGGtGhLcIpzJ0gMX5crLCAStS4e2YBY=
