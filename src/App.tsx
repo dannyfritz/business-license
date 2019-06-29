@@ -31,7 +31,7 @@ const App: React.FC = () => {
 
             return (
               <LoadScript
-                googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API}
+                googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY}
               >
                 <GoogleMap
                   mapContainerStyle={{ height: "100vh", width: "100vw" }}
