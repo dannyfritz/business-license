@@ -8,7 +8,7 @@ import { DateTime } from "luxon";
 export const ShortTermRental: React.FC = () => {
     const [selectedRental, setSelectedRental]: [{ bfn: string, latitude: number, longitude: number } | null, any]
         = useState(null);
-    const [mapOptions, setMapOptions] = useState({
+    const [mapOptions] = useState({
         zoom: 12,
         center: {
             lat: 39.739346,
