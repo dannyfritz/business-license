@@ -1,5 +1,5 @@
 import React from 'react';
-import './App.css';
+import './App.scss';
 import ApolloClient from "apollo-boost";
 import { ApolloProvider } from '@apollo/react-hooks';
 import { SitePlansTable } from "./SitePlansTable";
