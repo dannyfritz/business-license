@@ -1,61 +1,95 @@
 import React, {
   useCallback,
-  useEffect,
   useState,
 } from 'react';
 import moment from "moment";
 import { useQuery } from '@apollo/react-hooks';
 import { gql } from "apollo-boost";
+import { FilterControl, FilterInput } from "./FilterControl";
 import {
+  EuiButtonEmpty,
   EuiDataGrid,
   EuiLoadingContent,
   EuiLink,
   EuiCallOut,
   EuiDataGridSorting,
+  EuiPopover,
   EuiToolTip,
 } from '@elastic/eui';
 import { Content } from './Content';
 
-const SITE_PLAN_QUERY = gql`
-  query Fetch ($count: Int, $offset: Int, $sortBy: [SitePlan_column]) {
-    SitePlanCount
-    SitePlans (count: $count, offset: $offset, sortBy: $sortBy) {
-      PLAN_NAME
-      RECEPTION_DATE
-      ADDRESS_LINE1
-    }
-  }
-`;
+const baseColumn = {
+  isExpandable: false,
+  isHidden: false,
+}
 
 const columns = [
   {
+    ...baseColumn,
     id: "PLAN_NAME",
-    isExpandable: false,
-
   },
   {
-    id: "RECEPTION_DATE",
-    isExpandable: false,
-  },
-  {
+    ...baseColumn,
     id: "ADDRESS_LINE1",
-    isExpandable: false,
+    initialWidth: 300,
   },
+  {
+    ...baseColumn,
+    id: "PROPOSED_USE_1",
+  },
+  {
+    ...baseColumn,
+    id: "RECORD_TYPE",
+    isHidden: true,
+  },
+  {
+    ...baseColumn,
+    id: "STATUS",
+    initialWidth: 150,
+  },
+  {
+    ...baseColumn,
+    id: "STATUS_DATE",
+    initialWidth: 150,
+  },
+  {
+    ...baseColumn,
+    id: "RECEPTION_DATE",
+    initialWidth: 150,
+  },
+  {
+    ...baseColumn,
+    id: "PARKING_SPACES",
+    initialWidth: 150,
+    isHidden: true,
+  },
+  {
+    ...baseColumn,
+    id: "PROP_HEIGHT",
+    initialWidth: 150,
+    isHidden: true,
+  },
+  {
+    ...baseColumn,
+    id: "PROP_STORIES",
+    initialWidth: 150,
+    isHidden: true,
+  },
+  {
+    ...baseColumn,
+    id: "GROSS_FLOOR_AREA",
+    initialWidth: 150,
+    isHidden: true,
+  },
+  {
+    ...baseColumn,
+    id: "DOCUMENT_1",
+    initialWidth: 150,
+    isHidden: true,
+  }
 ];
 
 const SitePlanCell = ({ loading, data, columnId, setCellProps }) => {
-  // useEffect(() => {
-  //   if (columnId === 'RECEPTION_DATE') {
-  //     const numeric = parseFloat(
-  //       data[columnId].match(/\d+\.\d+/)[0]
-  //     );
-  //     setCellProps({
-  //       style: {
-  //         backgroundColor: `rgba(0, 255, 0, ${numeric * 0.02})`,
-  //       },
-  //     });
-  //   }
-  // }, [data, columnId, setCellProps]);
   if (loading) {
     return <EuiLoadingContent lines={1} />
   }
@@ -68,7 +102,11 @@ const SitePlanCell = ({ loading, data, columnId, setCellProps }) => {
         </EuiLink>
       );
     case "RECEPTION_DATE":
+    case "STATUS_DATE":
       const m = moment(d);
+      if (!m.isValid()) {
+        return "";
+      }
       return (
         <EuiToolTip content={m.fromNow()}>
           <p>{ m.format("YYYY-MM-DD") }</p>
@@ -97,30 +135,100 @@ export const SitePlansTable = () => {
     [setSortingColumns]
   );
 
-  const [visibleColumns, setVisibleColumns] = useState(() =>
-    columns.map(({ id }) => id)
+  const [filterInput, setFilterInput] =
+    useState<FilterInput>({
+      all: [],
+      groups: [],
+    });
+  const onSetFilterInput = useCallback(
+    (filterInput: FilterInput) => setFilterInput(filterInput),
+    [setFilterInput],
+  );
+  const numberOfFiltersApplied = filterInput.all.length + filterInput.groups.reduce((sum, g) => sum + g.length, 0);
+
+  const[isFilterOpen, setIsFilterOpen] =
+    useState(false);
+  const onToggleIsFilterOpen = useCallback(
+    () => setIsFilterOpen(!isFilterOpen),
+    [setIsFilterOpen, isFilterOpen],
   );
 
-  const { loading, error, data } = useQuery(SITE_PLAN_QUERY, {
+  const [visibleColumns, setVisibleColumns] = useState(() =>
+    columns.filter(({ isHidden }) => !isHidden).map(({ id }) => id)
+  );
+
+  // const SITE_PLAN_SCHEMA_QUERY = gql`
+  //   query {
+  //     SitePlanSchema {
+  //       column
+  //       type
+  //     }
+  //   }
+  // `;
+  // const { loading: schemaLoading, error: schemaError, data: schema } = useQuery(SITE_PLAN_SCHEMA_QUERY);
+
+  const SITE_PLAN_QUERY = gql`
+    query Fetch ($count: Int, $offset: Int, $sortBy: [SitePlanSort], $filterBy: [SitePlanFilterInput]) {
+      SitePlanCount
+      SitePlans (count: $count, offset: $offset, sortBy: $sortBy, filterBy: $filterBy) {
+        PLAN_NAME
+        RECEPTION_DATE
+        ADDRESS_LINE1
+        PARKING_SPACES
+        STATUS
+        RECORD_TYPE
+        STATUS_DATE
+        PROPOSED_USE_1
+        PROP_HEIGHT
+        PROP_STORIES
+        GROSS_FLOOR_AREA
+        DOCUMENT_1
+      }
+    }
+  `;
+  const { loading: rowsLoading, error: rowsError, data: rowsData } = useQuery(SITE_PLAN_QUERY, {
     variables: {
       count: pagination.pageSize,
       offset: pagination.pageIndex * pagination.pageSize,
-      sortBy: sortingColumns.map(sort => `${sort.id}_${sort.direction.toUpperCase()}`),
+      sortBy: sortingColumns.map(sort => ({
+        column: sort.id,
+        direction: sort.direction.toUpperCase(),
+      })),
+      filterBy: filterInput,
     }
   });
 
   const renderCellValue = ({ rowIndex, columnId, setCellProps }) => {
-    const rowData = data.SitePlans[rowIndex - pagination.pageSize * pagination.pageIndex]
-    return <SitePlanCell loading={loading} data={rowData} columnId={columnId} setCellProps={setCellProps} />;
+    if (rowsLoading) {
+      return <EuiLoadingContent lines={1} />
+    }
+    const rowData = rowsData.SitePlans[rowIndex - pagination.pageSize * pagination.pageIndex]
+    return <SitePlanCell loading={rowsLoading} data={rowData} columnId={columnId} setCellProps={setCellProps} />;
   };
 
-  if (error) {
+  if (rowsError) {
     return (
       <EuiCallOut title="Sorry, there was an error" color="danger" iconType="alert">
-        <p>{error}</p>
+        <p>{rowsError.message}</p>
       </EuiCallOut>
     )
   }
+
+  const filterButton = (
+    <EuiButtonEmpty
+      iconType="filter"
+      onClick={onToggleIsFilterOpen}
+      color="text"
+      size="xs"
+      className={`${numberOfFiltersApplied > 0 ? "euiDataGrid__controlBtn--active" : ""}`}
+    >
+      {
+        numberOfFiltersApplied === 0
+          ? "Filters"
+          : `${numberOfFiltersApplied} filters applied`
+      }
+    </EuiButtonEmpty>
+  )
 
   return (
     <Content
@@ -131,15 +239,32 @@ export const SitePlansTable = () => {
         aria-label="Site Plans Data Table"
         columns={columns}
         columnVisibility={{ visibleColumns, setVisibleColumns }}
-        rowCount={data ? data.SitePlanCount : 0}
+        rowCount={rowsData ? rowsData.SitePlanCount : pagination.pageSize}
         renderCellValue={renderCellValue}
         toolbarVisibility={{
           showFullScreenSelector: false,
+          additionalControls: (
+            <>
+              <EuiPopover
+                anchorPosition="downLeft"
+                button={filterButton}
+                ownFocus
+                isOpen={isFilterOpen}
+                closePopover={onToggleIsFilterOpen}
+                panelClassName="euiDataGridColumnSortingPopover"
+                panelPaddingSize="s"
+              >
+                <FilterControl
+                  filterInput={filterInput}
+                  onSetFilterInput={onSetFilterInput}
+                />
+              </EuiPopover>
+            </>
+          )
         }}
         gridStyle={{
-          stripes: true,
+          // stripes: true,
           header: "shade",
-          border: "horizontal",
         }}
         sorting={{
           columns: sortingColumns,
