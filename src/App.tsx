@@ -2,7 +2,8 @@ import React from 'react';
 import './App.scss';
 import ApolloClient from "apollo-boost";
 import { ApolloProvider } from '@apollo/react-hooks';
-import { SitePlansTable } from "./SitePlansTable";
+import { EsriDataTable } from "./SitePlansTable";
+import { Content } from './Content';
 import {
   // EuiLink,
   // EuiHeader,
@@ -34,7 +35,12 @@ const App: React.FC = () => {
             </EuiPageSideBar>
           </EuiNavDrawer> */}
           <EuiPageBody>
-            <SitePlansTable />
+            <Content
+              title="Denver Site Plans"
+              source="https://www.denvergov.org/opendata/dataset/city-and-county-of-denver-site-development-plans"
+            >
+              <EsriDataTable />
+            </Content>
           </EuiPageBody>
         </EuiPage>
       </div>

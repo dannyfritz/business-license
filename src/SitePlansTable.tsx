@@ -1,6 +1,8 @@
 import React, {
   useCallback,
   useState,
+  useContext,
+  FunctionComponent
 } from 'react';
 import moment from "moment";
 import { useQuery } from '@apollo/react-hooks';
@@ -9,6 +11,7 @@ import { FilterControl, FilterInput } from "./FilterControl";
 import {
   EuiButtonEmpty,
   EuiDataGrid,
+  EuiLoadingChart,
   EuiLoadingContent,
   EuiLink,
   EuiCallOut,
@@ -16,11 +19,191 @@ import {
   EuiPopover,
   EuiToolTip,
 } from '@elastic/eui';
-import { Content } from './Content';
 
 const baseColumn = {
   isExpandable: false,
   isHidden: false,
+}
+
+export enum SchemaKind {
+  Int,
+  Float,
+  Date,
+  String,
+};
+
+export interface Schema {
+  column: string,
+  type: SchemaKind,
+}
+
+interface Pagination {
+  pageIndex: number,
+  pageSize: number,
+};
+
+interface IEsriDataTableContext {
+  state: {
+    schema: Array<Schema>;
+    visibleColumns: Array<any>
+    pagination: Pagination,
+    sorting: EuiDataGridSorting["columns"],
+    filters: FilterInput,
+  },
+  actions: {
+    setVisibleColumns: any,
+    setPagination: (pagination: Pagination) => void,
+    onChangeItemsPerPage: any,
+    onChangePage: any,
+    onSort: any,
+    setFilters: any,
+    onSetFilters: any,
+    onAddGroup: any,
+    onRemoveGroup: any,
+    onAddAllFilter: any,
+    onRemoveAllFilter: any,
+    onAddFilter: any,
+    onRemoveFilter: any,
+  };
+}
+
+export const EsriDataTableContext = React.createContext<IEsriDataTableContext>(null as IEsriDataTableContext);
+
+export const EsriDataTable = () => {
+  const SITE_PLAN_SCHEMA_QUERY = gql`
+    query {
+      SitePlansSchema {
+        column
+        type
+      }
+    }
+  `;
+  const { loading: schemaLoading, error: schemaError, data } = useQuery(SITE_PLAN_SCHEMA_QUERY);
+
+  const [pagination, setPagination] = useState<Pagination>({ pageIndex: 0, pageSize: 10 });
+  const onChangeItemsPerPage = useCallback(
+    pageSize => setPagination(pagination => ({ ...pagination, pageSize })),
+    [setPagination]
+  );
+  const onChangePage = useCallback(
+    pageIndex => setPagination(pagination => ({ ...pagination, pageIndex })),
+    [setPagination]
+  );
+
+  const [sorting, setSorting] =
+    useState<EuiDataGridSorting["columns"]>([{ id: "RECEPTION_DATE", direction: "desc" }]);
+  const onSort = useCallback(
+    sortingColumns => setSorting(sortingColumns),
+    [setSorting]
+  );
+
+  const [filters, setFilters] =
+    useState<FilterInput>({
+      all: [],
+      groups: [],
+    });
+  const onSetFilters = useCallback(
+    (filters: FilterInput) => setFilters(filters),
+    [setFilters],
+  );
+
+  const [visibleColumns, setVisibleColumns] = useState(() =>
+    columns.filter(({ isHidden }) => !isHidden).map(({ id }) => id)
+  );
+  const onAddGroup = useCallback(
+    () => onSetFilters({
+      ...filters,
+      groups: [...filters.groups, []],
+    }),
+    [filters, onSetFilters],
+  )
+  const onRemoveGroup = useCallback(
+    (index) => onSetFilters({
+      ...filters,
+      groups: filters.groups.filter((_, i) => i !== index)
+    }),
+    [filters, onSetFilters],
+  )
+  const onAddAllFilter = useCallback(
+    () => onSetFilters({
+      ...filters,
+      all: [...filters.all, {}],
+    }),
+    [filters, onSetFilters],
+  )
+  const onRemoveAllFilter = useCallback(
+    (index) => onSetFilters({
+      ...filters,
+      all: filters.all.filter((_, i) => i !== index),
+    }),
+    [filters, onSetFilters],
+  )
+  const onAddFilter = useCallback(
+    (index) => {
+      const group = [...filters.groups[index], {}];
+      const groups = [...filters.groups];
+      groups[index] = group;
+      onSetFilters({
+        ...filters,
+        groups
+      });
+    },
+    [filters, onSetFilters],
+  )
+  const onRemoveFilter = useCallback(
+    (groupIndex, index) => {
+      const group = filters.groups[groupIndex].filter((_, i) => i !== index);
+      const groups = [...filters.groups];
+      groups[groupIndex] = group;
+      onSetFilters({
+        ...filters,
+        groups
+      });
+    },
+    [filters, onSetFilters],
+  )
+
+  if (schemaError) {
+    return (
+      <EuiCallOut title="Sorry, there was an error" color="danger" iconType="alert">
+        <p>{schemaError.message}</p>
+      </EuiCallOut>
+    )
+  } else if (schemaLoading) {
+    return (
+      <EuiLoadingChart size="xl" />
+    );
+  }
+
+  const context = {
+    state: {
+      schema: data.SitePlansSchema,
+      visibleColumns,
+      pagination,
+      sorting,
+      filters,
+    },
+    actions: {
+      setVisibleColumns,
+      setPagination,
+      onChangeItemsPerPage,
+      onChangePage,
+      onSort,
+      setFilters,
+      onSetFilters,
+      onAddGroup,
+      onRemoveGroup,
+      onAddAllFilter,
+      onRemoveAllFilter,
+      onAddFilter,
+      onRemoveFilter,
+    },
+  };
+  return (
+    <EsriDataTableContext.Provider value={context}>
+      <DataTable />
+    </EsriDataTableContext.Provider>
+  );
 }
 
 const columns = [
@@ -89,7 +272,7 @@ const columns = [
   }
 ];
 
-const SitePlanCell = ({ loading, data, columnId, setCellProps }) => {
+const DataTableCell = ({ loading, data, columnId, setCellProps }) => {
   if (loading) {
     return <EuiLoadingContent lines={1} />
   }
@@ -117,34 +300,40 @@ const SitePlanCell = ({ loading, data, columnId, setCellProps }) => {
   }
 }
 
-export const SitePlansTable = () => {
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
-  const onChangeItemsPerPage = useCallback(
-    pageSize => setPagination(pagination => ({ ...pagination, pageSize })),
-    [setPagination]
-  );
-  const onChangePage = useCallback(
-    pageIndex => setPagination(pagination => ({ ...pagination, pageIndex })),
-    [setPagination]
-  );
+export interface DataTableProps {};
 
-  const [sortingColumns, setSortingColumns] =
-    useState<EuiDataGridSorting["columns"]>([{ id: "RECEPTION_DATE", direction: "desc" }]);
-  const onSort = useCallback(
-    sortingColumns => setSortingColumns(sortingColumns),
-    [setSortingColumns]
-  );
+export const DataTable: FunctionComponent<DataTableProps> = () => {
+  const {
+    state: {
+      schema, pagination, sorting, filters, visibleColumns
+    },
+    actions: {
+      setVisibleColumns,
+      onSort,
+      onChangeItemsPerPage,
+      onChangePage,
+    }
+  } = useContext(EsriDataTableContext);
 
-  const [filterInput, setFilterInput] =
-    useState<FilterInput>({
-      all: [],
-      groups: [],
-    });
-  const onSetFilterInput = useCallback(
-    (filterInput: FilterInput) => setFilterInput(filterInput),
-    [setFilterInput],
-  );
-  const numberOfFiltersApplied = filterInput.all.length + filterInput.groups.reduce((sum, g) => sum + g.length, 0);
+  const SITE_PLAN_QUERY = gql`
+    query Fetch ($count: Int, $offset: Int, $sortBy: [SitePlanSort], $filterBy: [SitePlanFilterInput]) {
+      SitePlanCount (filterBy: $filterBy)
+      SitePlans (count: $count, offset: $offset, sortBy: $sortBy, filterBy: $filterBy) {
+        ${schema.map(s => `${s.column}\n`)}
+      }
+    }
+  `;
+  const { loading: rowsLoading, error: rowsError, data: rowsData } = useQuery(SITE_PLAN_QUERY, {
+    variables: {
+      count: pagination.pageSize,
+      offset: pagination.pageIndex * pagination.pageSize,
+      sortBy: sorting.map(sort => ({
+        column: sort.id,
+        direction: sort.direction.toUpperCase(),
+      })),
+      filterBy: filters,
+    }
+  });
 
   const[isFilterOpen, setIsFilterOpen] =
     useState(false);
@@ -153,57 +342,12 @@ export const SitePlansTable = () => {
     [setIsFilterOpen, isFilterOpen],
   );
 
-  const [visibleColumns, setVisibleColumns] = useState(() =>
-    columns.filter(({ isHidden }) => !isHidden).map(({ id }) => id)
-  );
-
-  // const SITE_PLAN_SCHEMA_QUERY = gql`
-  //   query {
-  //     SitePlanSchema {
-  //       column
-  //       type
-  //     }
-  //   }
-  // `;
-  // const { loading: schemaLoading, error: schemaError, data: schema } = useQuery(SITE_PLAN_SCHEMA_QUERY);
-
-  const SITE_PLAN_QUERY = gql`
-    query Fetch ($count: Int, $offset: Int, $sortBy: [SitePlanSort], $filterBy: [SitePlanFilterInput]) {
-      SitePlanCount
-      SitePlans (count: $count, offset: $offset, sortBy: $sortBy, filterBy: $filterBy) {
-        PLAN_NAME
-        RECEPTION_DATE
-        ADDRESS_LINE1
-        PARKING_SPACES
-        STATUS
-        RECORD_TYPE
-        STATUS_DATE
-        PROPOSED_USE_1
-        PROP_HEIGHT
-        PROP_STORIES
-        GROSS_FLOOR_AREA
-        DOCUMENT_1
-      }
-    }
-  `;
-  const { loading: rowsLoading, error: rowsError, data: rowsData } = useQuery(SITE_PLAN_QUERY, {
-    variables: {
-      count: pagination.pageSize,
-      offset: pagination.pageIndex * pagination.pageSize,
-      sortBy: sortingColumns.map(sort => ({
-        column: sort.id,
-        direction: sort.direction.toUpperCase(),
-      })),
-      filterBy: filterInput,
-    }
-  });
-
   const renderCellValue = ({ rowIndex, columnId, setCellProps }) => {
     if (rowsLoading) {
       return <EuiLoadingContent lines={1} />
     }
     const rowData = rowsData.SitePlans[rowIndex - pagination.pageSize * pagination.pageIndex]
-    return <SitePlanCell loading={rowsLoading} data={rowData} columnId={columnId} setCellProps={setCellProps} />;
+    return <DataTableCell loading={rowsLoading} data={rowData} columnId={columnId} setCellProps={setCellProps} />;
   };
 
   if (rowsError) {
@@ -213,6 +357,8 @@ export const SitePlansTable = () => {
       </EuiCallOut>
     )
   }
+
+  const numberOfFiltersApplied = filters.all.length + filters.groups.reduce((sum, g) => sum + g.length, 0);
 
   const filterButton = (
     <EuiButtonEmpty
@@ -231,10 +377,6 @@ export const SitePlansTable = () => {
   )
 
   return (
-    <Content
-      title="Denver Site Plans"
-      source="https://www.denvergov.org/opendata/dataset/city-and-county-of-denver-site-development-plans"
-    >
       <EuiDataGrid
         aria-label="Site Plans Data Table"
         columns={columns}
@@ -254,20 +396,16 @@ export const SitePlansTable = () => {
                 panelClassName="euiDataGridColumnSortingPopover"
                 panelPaddingSize="s"
               >
-                <FilterControl
-                  filterInput={filterInput}
-                  onSetFilterInput={onSetFilterInput}
-                />
+                <FilterControl />
               </EuiPopover>
             </>
           )
         }}
         gridStyle={{
-          // stripes: true,
           header: "shade",
         }}
         sorting={{
-          columns: sortingColumns,
+          columns: sorting,
           onSort
         }}
         pagination={{
@@ -277,6 +415,5 @@ export const SitePlansTable = () => {
           onChangePage: onChangePage,
         }}
       />
-    </Content>
   );
 };

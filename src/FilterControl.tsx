@@ -1,4 +1,4 @@
-import React, { FunctionComponent, useCallback } from "react";
+import React, { FunctionComponent, useCallback, useContext } from "react";
 import {
   EuiButtonIcon,
   EuiButtonEmpty,
@@ -7,6 +7,7 @@ import {
   EuiFlexItem,
   EuiTitle,
 } from '@elastic/eui';
+import { SchemaKind, EsriDataTableContext } from "./SitePlansTable";
 
 export interface FilterInput {
   all: FilterGroup,
@@ -24,13 +25,6 @@ export enum CriteriaType {
 };
 
 export type FilterGroup = Array<Filter>;
-
-enum SchemaKind {
-  Int,
-  Float,
-  Date,
-  String,
-};
 
 export interface Filter {
   column?: string,
@@ -50,6 +44,11 @@ interface FilterListProps {
 const FilterListItem: FunctionComponent<FilterListProps> = ({
   filter, onRemoveFilter
 }) => {
+  const {
+    state: {
+      schema
+    }
+  } = useContext(EsriDataTableContext);
   return (
     <EuiFlexGroup>
       <EuiFlexItem grow={false}>
@@ -107,7 +106,7 @@ const FilterGroupPanel: FunctionComponent<FilterGroupPanelProps> = ({
           </EuiFlexGroup>
         </EuiFlexItem>
         <EuiFlexItem>
-          {filterGroup.map((f, i) => <FilterListItem onRemoveFilter={() => onRemoveFilter(i)} filter={f} />)}
+          {filterGroup.map((f, i) => <FilterListItem key={i} onRemoveFilter={() => onRemoveFilter(i)} filter={f} />)}
           <EuiButtonEmpty
             iconType="plusInCircle"
             color="primary"
@@ -122,79 +121,43 @@ const FilterGroupPanel: FunctionComponent<FilterGroupPanelProps> = ({
   );
 }
 
-export interface FilterControlProps {
-  filterInput: FilterInput,
-  onSetFilterInput: (filterInput: FilterInput) => void,
-};
+export interface FilterControlProps {};
 
-export const FilterControl: FunctionComponent<FilterControlProps> = ({
-  filterInput, onSetFilterInput,
-}) => {
-  const onRemoveGroup = useCallback(
-    (index) => onSetFilterInput({
-      ...filterInput,
-      groups: filterInput.groups.filter((_, i) => i !== index)
-    }),
-    [filterInput, onSetFilterInput],
-  )
-  const onAddAllFilter = useCallback(
-    () => onSetFilterInput({
-      ...filterInput,
-      all: [...filterInput.all, {}],
-    }),
-    [filterInput, onSetFilterInput],
-  )
-  const onRemoveAllFilter = useCallback(
-    (index) => onSetFilterInput({
-      ...filterInput,
-      all: filterInput.all.filter((_, i) => i !== index),
-    }),
-    [filterInput, onSetFilterInput],
-  )
-  const onAddFilter = useCallback(
-    (index) => {
-      const group = [...filterInput.groups[index], {}];
-      const groups = [...filterInput.groups];
-      groups[index] = group;
-      onSetFilterInput({
-        ...filterInput,
-        groups
-      });
+export const FilterControl: FunctionComponent<FilterControlProps> = () => {
+  const {
+    state: {
+      filters,
     },
-    [filterInput, onSetFilterInput],
-  )
-  const onRemoveFilter = useCallback(
-    (groupIndex, index) => {
-      const group = filterInput.groups[groupIndex].filter((_, i) => i !== index);
-      const groups = [...filterInput.groups];
-      groups[groupIndex] = group;
-      onSetFilterInput({
-        ...filterInput,
-        groups
-      });
+    actions: {
+      onAddAllFilter,
+      onRemoveAllFilter,
+      onAddFilter,
+      onRemoveFilter,
+      onAddGroup,
+      onRemoveGroup,
     },
-    [filterInput, onSetFilterInput],
-  )
+  } = useContext(EsriDataTableContext);
+
   return (
     <EuiFlexGroup direction="column" gutterSize="s" style={{minWidth: "600px"}}>
         <EuiFlexItem grow={false}>
           <FilterGroupPanel
             onRemoveFilter={onRemoveAllFilter}
             onAddFilter={onAddAllFilter}
-            filterGroup={filterInput.all}
+            filterGroup={filters.all}
             isRemovable={false}
-            title={`All Groups`}
+            title={`Global Filters`}
           />
         </EuiFlexItem>
         {
-          filterInput.groups.map((fg, i) => (
+          filters.groups.map((fg, i) => (
             <EuiFlexItem grow={false} key={i}>
               <FilterGroupPanel
                 onRemoveFilter={(fi) => onRemoveFilter(i, fi)}
                 onAddFilter={() => onAddFilter(i)}
                 filterGroup={fg}
                 onRemoveGroup={() => onRemoveGroup(i)}
-                isRemovable title={`Group ${i}`}
+                isRemovable title={`Group ${i + 1}`}
               />
             </EuiFlexItem>
           ))
@@ -203,10 +166,7 @@ export const FilterControl: FunctionComponent<FilterControlProps> = ({
           <EuiButtonEmpty
             iconType="plusInCircle"
             color="primary"
-            onClick={() => {onSetFilterInput({
-              ...filterInput,
-              groups: [...filterInput.groups, []],
-            })}}
+            onClick={onAddGroup}
           >
             Add Filter Group
           </EuiButtonEmpty>
