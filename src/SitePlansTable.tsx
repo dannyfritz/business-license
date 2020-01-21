@@ -26,10 +26,10 @@ const baseColumn = {
 }
 
 export enum SchemaKind {
-  Int,
-  Float,
-  Date,
-  String,
+  Int = "Int",
+  Float = "Float",
+  Date = "Date",
+  String = "String",
 };
 
 export interface Schema {
